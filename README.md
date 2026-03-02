@@ -2,6 +2,16 @@
 
 Flutter app with Google Maps: stage route, closed roads (GPX), Street View, and optional routing with “crosses stage” detection.
 
+## Release Notes
+
+- **What this app does**: Displays rally stages on Google Maps with stage polylines, Start/Finish markers, closed-road overlays from GPX, and Street View entry from map tap.
+- **Street View package compatibility**: Custom update applied to `flutter_google_street_view_v2: ^1.0.1` to keep Street View behavior compatible with newer platform/runtime changes.
+- **Closed roads styling**: Road closures are rendered as **red polylines** (`closed_1`, `closed_2`, `closed_3`) on top of the rally map.
+- **Rally logo zoom logic**:
+  - Logo is visible only when zoom is between `0` and `5` (inclusive).
+  - Logo is hidden when zoom is greater than `5`.
+  - Logo is anchored to the rally location (Stage 1 start), so it stays geographically fixed while panning/zooming.
+
 ## Setup
 
 ### Prerequisites

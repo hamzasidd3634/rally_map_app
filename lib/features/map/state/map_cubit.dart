@@ -21,7 +21,7 @@ class MapCubit extends Cubit<MapState> {
           cameraPosition: initialCamera ??
               const CameraPosition(
                 target: LatLng(48.8610, 2.3610),
-                zoom: 4.0,
+                zoom: 1.0,
               ),
           isLoading: true,
         )) {
@@ -43,11 +43,11 @@ class MapCubit extends Cubit<MapState> {
         if (firstPoints.isNotEmpty) {
           initialCamera = CameraPosition(
             target: firstPoints.first,
-            zoom: 8.0,
+            zoom: 1.0,
           );
         }
       }
-      final zoom = initialCamera?.zoom ?? state.cameraPosition?.zoom ?? 8.0;
+      final zoom = initialCamera?.zoom ?? state.cameraPosition?.zoom ?? 1.0;
       final rallyLogoVisible = zoom >= rallyLogoZoomMin && zoom <= rallyLogoZoomThreshold;
       emit(state.copyWith(
         stages: stages,

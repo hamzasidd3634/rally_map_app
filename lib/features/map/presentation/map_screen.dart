@@ -38,7 +38,7 @@ class _MapScreenState extends State<MapScreen> {
   /// Rally logo overlay: use assets/images/rally_logo.png; fallback to default marker if missing/invalid.
   Future<BitmapDescriptor> _getRallyLogoDescriptor() async {
     try {
-      const int targetWidthPx = 80; // try 60–100
+      const int targetWidthPx = 400; // try 60–100
       final ByteData data = await rootBundle.load('assets/images/rally_logo.png');
 
       final ui.Codec codec = await ui.instantiateImageCodec(
@@ -169,7 +169,7 @@ class _MapScreenState extends State<MapScreen> {
               return Center(child: Text('Error: ${state.error}'));
             }
             final initialPosition = state.cameraPosition ??
-                const CameraPosition(target: LatLng(48.8610, 2.3610), zoom: 4.0);
+                const CameraPosition(target: LatLng(48.8610, 2.3610), zoom: 1.0);
             final polylines = state.polylines;
             final markers = state.markers;
             // Rally logo overlay: visible when zoom in [0, 5], anchored at rally location (stage 1 start).
