@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="rally_map_app">
+  <trk>
+    <name>Closed Road 1 (near Stage 2)</name>
+    <trkseg>
+      <trkpt lat="52.07113" lon="-9.74793"><ele>50</ele></trkpt>
+      <trkpt lat="52.07064" lon="-9.74855"><ele>50</ele></trkpt>
+      <trkpt lat="52.07049" lon="-9.74873"><ele>50</ele></trkpt>
+      <trkpt lat="52.06999" lon="-9.74938"><ele>51</ele></trkpt>
+      <trkpt lat="52.06974" lon="-9.74973"><ele>51</ele></trkpt>
+      <trkpt lat="52.06931" lon="-9.75028"><ele>51</ele></trkpt>
+      <trkpt lat="52.06889" lon="-9.75082"><ele>52</ele></trkpt>
+      <trkpt lat="52.06847" lon="-9.75138"><ele>52</ele></trkpt>
+      <trkpt lat="52.06824" lon="-9.75169"><ele>52</ele></trkpt>
+      <trkpt lat="52.06814" lon="-9.75184"><ele>52</ele></trkpt>
+      <trkpt lat="52.06810" lon="-9.75191"><ele>53</ele></trkpt>
+      <trkpt lat="52.06801" lon="-9.75207"><ele>53</ele></trkpt>
+      <trkpt lat="52.06784" lon="-9.75242"><ele>53</ele></trkpt>
+      <trkpt lat="52.06768" lon="-9.75284"><ele>53</ele></trkpt>
+      <trkpt lat="52.06746" lon="-9.75343"><ele>54</ele></trkpt>
+      <trkpt lat="52.06734" lon="-9.75384"><ele>54</ele></trkpt>
+      <trkpt lat="52.06731" lon="-9.75390"><ele>54</ele></trkpt>
+      <trkpt lat="52.06728" lon="-9.75393"><ele>54</ele></trkpt>
+      <trkpt lat="52.06724" lon="-9.75394"><ele>55</ele></trkpt>
+      <trkpt lat="52.06719" lon="-9.75395"><ele>55</ele></trkpt>
+      <trkpt lat="52.06705" lon="-9.75394"><ele>55</ele></trkpt>
+      <trkpt lat="52.06677" lon="-9.75380"><ele>55</ele></trkpt>
+      <trkpt lat="52.06641" lon="-9.75360"><ele>56</ele></trkpt>
+      <trkpt lat="52.06551" lon="-9.75319"><ele>56</ele></trkpt>
+      <trkpt lat="52.06469" lon="-9.75292"><ele>56</ele></trkpt>
+      <trkpt lat="52.06460" lon="-9.75290"><ele>57</ele></trkpt>
+      <trkpt lat="52.06368" lon="-9.75253"><ele>57</ele></trkpt>
+      <trkpt lat="52.06313" lon="-9.75217"><ele>57</ele></trkpt>
+      <trkpt lat="52.06247" lon="-9.75178"><ele>58</ele></trkpt>
+      <trkpt lat="52.06191" lon="-9.75143"><ele>58</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

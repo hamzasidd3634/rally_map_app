@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="rally_map_app">
+  <trk>
+    <name>Closed Road 3 (near Stage 2)</name>
+    <trkseg>
+      <trkpt lat="52.05058" lon="-9.74910"><ele>70</ele></trkpt>
+      <trkpt lat="52.05050" lon="-9.74994"><ele>70</ele></trkpt>
+      <trkpt lat="52.05040" lon="-9.75046"><ele>71</ele></trkpt>
+      <trkpt lat="52.05029" lon="-9.75057"><ele>71</ele></trkpt>
+      <trkpt lat="52.05019" lon="-9.75059"><ele>71</ele></trkpt>
+      <trkpt lat="52.05015" lon="-9.75064"><ele>71</ele></trkpt>
+      <trkpt lat="52.05009" lon="-9.75073"><ele>72</ele></trkpt>
+      <trkpt lat="52.05005" lon="-9.75080"><ele>72</ele></trkpt>
+      <trkpt lat="52.05003" lon="-9.75081"><ele>72</ele></trkpt>
+      <trkpt lat="52.05000" lon="-9.75080"><ele>72</ele></trkpt>
+      <trkpt lat="52.04998" lon="-9.75078"><ele>73</ele></trkpt>
+      <trkpt lat="52.04997" lon="-9.75072"><ele>73</ele></trkpt>
+      <trkpt lat="52.04999" lon="-9.75062"><ele>73</ele></trkpt>
+      <trkpt lat="52.05010" lon="-9.75001"><ele>73</ele></trkpt>
+      <trkpt lat="52.05017" lon="-9.74861"><ele>74</ele></trkpt>
+      <trkpt lat="52.05022" lon="-9.74839"><ele>74</ele></trkpt>
+      <trkpt lat="52.05056" lon="-9.74742"><ele>74</ele></trkpt>
+      <trkpt lat="52.05075" lon="-9.74651"><ele>75</ele></trkpt>
+      <trkpt lat="52.05081" lon="-9.74616"><ele>75</ele></trkpt>
+      <trkpt lat="52.05083" lon="-9.74582"><ele>75</ele></trkpt>
+      <trkpt lat="52.05080" lon="-9.74564"><ele>75</ele></trkpt>
+      <trkpt lat="52.05067" lon="-9.74534"><ele>76</ele></trkpt>
+      <trkpt lat="52.05043" lon="-9.74493"><ele>76</ele></trkpt>
+      <trkpt lat="52.05026" lon="-9.74468"><ele>76</ele></trkpt>
+      <trkpt lat="52.05017" lon="-9.74450"><ele>77</ele></trkpt>
+      <trkpt lat="52.05010" lon="-9.74433"><ele>77</ele></trkpt>
+      <trkpt lat="52.05005" lon="-9.74415"><ele>77</ele></trkpt>
+      <trkpt lat="52.05003" lon="-9.74403"><ele>77</ele></trkpt>
+      <trkpt lat="52.04997" lon="-9.74247"><ele>78</ele></trkpt>
+      <trkpt lat="52.04996" lon="-9.74148"><ele>78</ele></trkpt>
+      <trkpt lat="52.05012" lon="-9.74029"><ele>78</ele></trkpt>
+      <trkpt lat="52.05014" lon="-9.74014"><ele>79</ele></trkpt>
+      <trkpt lat="52.05018" lon="-9.74003"><ele>79</ele></trkpt>
+      <trkpt lat="52.05027" lon="-9.73990"><ele>79</ele></trkpt>
+      <trkpt lat="52.05047" lon="-9.73964"><ele>80</ele></trkpt>
+      <trkpt lat="52.05069" lon="-9.73940"><ele>80</ele></trkpt>
+      <trkpt lat="52.05102" lon="-9.73912"><ele>80</ele></trkpt>
+      <trkpt lat="52.05141" lon="-9.73884"><ele>81</ele></trkpt>
+      <trkpt lat="52.05172" lon="-9.73861"><ele>81</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
