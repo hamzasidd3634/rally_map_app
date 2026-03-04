@@ -9,6 +9,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 /// stable IDs (stage_1, stage_2, stage_3, closed_1, closed_2, closed_3, start_*, finish_*)
 /// so the map does not flicker or rebuild overlays while panning/zooming.
 class MapState extends Equatable {
+  static const Object _unset = Object();
+
   const MapState({
     this.cameraPosition,
     this.stagePoints = const [],
@@ -176,13 +178,13 @@ class MapState extends Equatable {
     bool? rallyLogoVisible,
     double? zoomLevel,
     bool? isLoading,
-    String? error,
-    LatLng? routeOrigin,
-    LatLng? routeDestination,
+    Object? error = _unset,
+    Object? routeOrigin = _unset,
+    Object? routeDestination = _unset,
     List<LatLng>? routeWaypoints,
     List<LatLng>? routePoints,
     bool? routeCrossesStage,
-    String? routeCrossesStageMessage,
+    Object? routeCrossesStageMessage = _unset,
     bool? isRouting,
   }) {
     return MapState(
@@ -193,13 +195,15 @@ class MapState extends Equatable {
       rallyLogoVisible: rallyLogoVisible ?? this.rallyLogoVisible,
       zoomLevel: zoomLevel ?? this.zoomLevel,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
-      routeOrigin: routeOrigin ?? this.routeOrigin,
-      routeDestination: routeDestination ?? this.routeDestination,
+      error: identical(error, _unset) ? this.error : error as String?,
+      routeOrigin: identical(routeOrigin, _unset) ? this.routeOrigin : routeOrigin as LatLng?,
+      routeDestination: identical(routeDestination, _unset) ? this.routeDestination : routeDestination as LatLng?,
       routeWaypoints: routeWaypoints ?? this.routeWaypoints,
       routePoints: routePoints ?? this.routePoints,
       routeCrossesStage: routeCrossesStage ?? this.routeCrossesStage,
-      routeCrossesStageMessage: routeCrossesStageMessage ?? this.routeCrossesStageMessage,
+      routeCrossesStageMessage: identical(routeCrossesStageMessage, _unset)
+          ? this.routeCrossesStageMessage
+          : routeCrossesStageMessage as String?,
       isRouting: isRouting ?? this.isRouting,
     );
   }
