@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:rally_map_app/features/routing/domain/geometry/distance_to_polyline.dart';
 import 'package:rally_map_app/features/routing/domain/geometry/projection.dart';
 import 'package:rally_map_app/features/routing/domain/geometry/segment_intersection.dart';
+import 'package:rally_map_app/features/routing/domain/export_google_maps_url.dart';
 
 import '../../street_view/presentation/street_view_screen.dart';
 import '../state/map_cubit.dart';
@@ -101,6 +103,24 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
     cubit.setRouteDestination(position);
+  }
+
+  Future<void> _exportRouteToGoogleMaps(MapState state) async {
+    final origin = state.routeOrigin;
+    final destination = state.routeDestination;
+    if (origin == null || destination == null) return;
+    final url = exportGoogleMapsDirectionsUrl(
+      origin: origin,
+      destination: destination,
+      waypoints: state.routeWaypoints,
+    );
+    final uri = Uri.parse(url);
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open Google Maps URL.')),
+      );
+    }
   }
 
   /// If tap is within ~25m of any stage polyline, snap to closest point on that stage.
@@ -271,6 +291,15 @@ class _MapScreenState extends State<MapScreen> {
                       onPressed: () => context.read<MapCubit>().clearRoute(),
                       icon: const Icon(Icons.clear),
                       label: const Text('Clear'),
+                    ),
+                    const SizedBox(height: 10),
+                    FloatingActionButton.extended(
+                      heroTag: 'export_route_btn',
+                      onPressed: (state.routeOrigin != null && state.routeDestination != null)
+                          ? () => _exportRouteToGoogleMaps(state)
+                          : null,
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('Export'),
                     ),
                   ],
                 ),

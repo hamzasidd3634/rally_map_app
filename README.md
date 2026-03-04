@@ -7,6 +7,7 @@ Flutter app with Google Maps: stage route, closed roads (GPX), Street View, and 
 - **What this app does**: Displays rally stages on Google Maps with stage polylines, Start/Finish markers, closed-road overlays from GPX, and Street View entry from map tap.
 - **Street View package compatibility**: Custom update applied to `flutter_google_street_view_v2: ^1.0.1` to keep Street View behavior compatible with newer platform/runtime changes.
 - **Closed roads styling**: Road closures are rendered as **red polylines** (`closed_1`, `closed_2`, `closed_3`) on top of the rally map.
+- **Route export**: User-selected routes (origin/destination pins, including reroute waypoints) can be exported as a Google Maps directions URL and opened in the Google Maps app/browser.
 - **Rally logo zoom logic**:
   - Logo is visible only when zoom is between `0` and `5` (inclusive).
   - Logo is hidden when zoom is greater than `5`.
@@ -122,15 +123,7 @@ flutter run
 - **Part A**: MapScreen with Google Map; stage polyline from `assets/data/stage.json`; Start/Finish markers; three closed-road GPX files parsed via `compute()` and simplified; stable polyline/marker IDs; smooth pan/zoom without overlay jank.
 - **Part B**: Rally logo overlay (marker with bitmap) at stage start; visible when zoom ≤ 5, hidden when zoom > 5; anchored correctly; logo cached.
 - **Part C**: Tap on map opens Street View at tapped point; if tap is near stage polyline (~25 m), snap to closest point on stage; Street View screen shows “Street View unavailable here” when no panorama; back returns to map with state preserved (camera/overlays) via app-level MapCubit.
-- **Part D (bonus)**: Routing domain: polyline intersection and distance helpers (pure Dart), `DirectionsClient` for Directions API, export Google Maps directions URL. Map state and cubit support route origin/destination, route polyline, and “crosses stage” detection and message; geometry covered by unit tests in `test/geometry/` and `test/routing/`.
-
----
-
-## If something is not completed
-
-- **Full routing UI**: Long-press to set origin/destination, “Get route” button, and “Export” (open Maps URL) can be wired to the existing `MapCubit` route methods and `DirectionsClient` + `exportGoogleMapsDirectionsUrl`. When the fetched route crosses the stage (via `routeCrossesStage(routePoints)`), show the “fastest route crosses a stage” message and request an alternate (e.g. with a waypoint around the stage bounding box) using the same client.
-- **Street View availability**: The app currently detects “unavailable” by loading the panorama and checking `getLocation()`. Option (a) in the spec—calling the Street View Metadata API—can be added in `StreetViewAvailabilityService` for a pre-check without loading the panorama.
-- **Google Maps API key**: Ensure the same key (or keys) are set for Android and iOS and that the required APIs are enabled in the Cloud Console.
+- **Part D (bonus)**: Routing domain: polyline intersection and distance helpers (pure Dart), `DirectionsClient` for Directions API, and Google Maps route export URL generation. UI supports long-press origin/destination pins, fastest route calculation, stage-crossing detection, automatic alternate reroute with user message, and an **Export** action that opens Google Maps with the selected route/waypoints.
 
 ---
 

@@ -19,6 +19,7 @@ dependencies:
   gpx: ^2.3.0
   http: ^1.6.0
   equatable: ^2.0.8
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
