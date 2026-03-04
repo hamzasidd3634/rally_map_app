@@ -20,9 +20,11 @@ class MapState extends Equatable {
     this.error,
     this.routeOrigin,
     this.routeDestination,
+    this.routeWaypoints = const [],
     this.routePoints = const [],
     this.routeCrossesStage = false,
     this.routeCrossesStageMessage,
+    this.isRouting = false,
   });
 
   final CameraPosition? cameraPosition;
@@ -39,9 +41,11 @@ class MapState extends Equatable {
   /// Part D: routing
   final LatLng? routeOrigin;
   final LatLng? routeDestination;
+  final List<LatLng> routeWaypoints;
   final List<LatLng> routePoints;
   final bool routeCrossesStage;
   final String? routeCrossesStageMessage;
+  final bool isRouting;
 
   static const _stageColors = [
     Colors.blue,
@@ -137,6 +141,13 @@ class MapState extends Equatable {
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
       ));
     }
+    for (var i = 0; i < routeWaypoints.length; i++) {
+      out.add(Marker(
+        markerId: MarkerId('route_waypoint_$i'),
+        position: routeWaypoints[i],
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+      ));
+    }
     return out;
   }
 
@@ -168,9 +179,11 @@ class MapState extends Equatable {
     String? error,
     LatLng? routeOrigin,
     LatLng? routeDestination,
+    List<LatLng>? routeWaypoints,
     List<LatLng>? routePoints,
     bool? routeCrossesStage,
     String? routeCrossesStageMessage,
+    bool? isRouting,
   }) {
     return MapState(
       cameraPosition: cameraPosition ?? this.cameraPosition,
@@ -183,9 +196,11 @@ class MapState extends Equatable {
       error: error,
       routeOrigin: routeOrigin ?? this.routeOrigin,
       routeDestination: routeDestination ?? this.routeDestination,
+      routeWaypoints: routeWaypoints ?? this.routeWaypoints,
       routePoints: routePoints ?? this.routePoints,
       routeCrossesStage: routeCrossesStage ?? this.routeCrossesStage,
       routeCrossesStageMessage: routeCrossesStageMessage ?? this.routeCrossesStageMessage,
+      isRouting: isRouting ?? this.isRouting,
     );
   }
 
@@ -201,8 +216,10 @@ class MapState extends Equatable {
         error,
         routeOrigin,
         routeDestination,
+        routeWaypoints,
         routePoints,
         routeCrossesStage,
         routeCrossesStageMessage,
+        isRouting,
       ];
 }

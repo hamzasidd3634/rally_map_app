@@ -4,6 +4,7 @@ import 'package:rally_map_app/features/routing/domain/geometry/polyline_intersec
 
 import '../data/gpx_service.dart';
 import '../data/stage_repository.dart';
+import '../../routing/data/directions_client.dart';
 import 'map_state.dart';
 
 /// Rally logo visibility: shown when camera zoom is in [0, 5] inclusive, hidden when zoom > 5.
@@ -14,9 +15,13 @@ class MapCubit extends Cubit<MapState> {
   MapCubit({
     StageRepository? stageRepository,
     GpxCache? gpxCache,
+    DirectionsClient? directionsClient,
+    String? directionsApiKey,
     CameraPosition? initialCamera,
   })  : _stageRepo = stageRepository ?? StageRepository(),
         _gpxCache = gpxCache ?? GpxCache(),
+        _directions = directionsClient ??
+            DirectionsClient(apiKey: "AIzaSyAfmGm_et883qbzn8h_ML-5gwBMoXypQTs"),
         super(MapState(
           cameraPosition: initialCamera ??
               const CameraPosition(
@@ -30,6 +35,7 @@ class MapCubit extends Cubit<MapState> {
 
   final StageRepository _stageRepo;
   final GpxCache _gpxCache;
+  final DirectionsClient _directions;
 
   Future<void> _loadMapData() async {
     try {
@@ -107,11 +113,13 @@ class MapCubit extends Cubit<MapState> {
     required List<LatLng> points,
     required bool crossesStage,
     String? crossesStageMessage,
+    List<LatLng>? waypoints,
   }) {
     emit(state.copyWith(
       routePoints: points,
       routeCrossesStage: crossesStage,
       routeCrossesStageMessage: crossesStageMessage,
+      routeWaypoints: waypoints ?? const [],
     ));
   }
 
@@ -120,10 +128,90 @@ class MapCubit extends Cubit<MapState> {
     emit(state.copyWith(
       routeOrigin: null,
       routeDestination: null,
+      routeWaypoints: [],
       routePoints: [],
       routeCrossesStage: false,
-      routeCrossesStageMessage: null,
+      routeCrossesStageMessage: '',
+      isRouting: false,
     ));
+  }
+
+  /// Build fastest route. If it crosses a stage, fetch an alternate route
+  /// using avoidance waypoints around the stage area.
+  Future<void> buildRouteWithStageAvoidance() async {
+    final origin = state.routeOrigin;
+    final destination = state.routeDestination;
+    if (origin == null || destination == null) return;
+    if (_directions.apiKey.trim().isEmpty) {
+      emit(state.copyWith(
+        routeCrossesStageMessage:
+            'Directions API key missing. Pass --dart-define=GOOGLE_MAPS_API_KEY=YOUR_KEY',
+      ));
+      return;
+    }
+    emit(state.copyWith(isRouting: true, routeCrossesStageMessage: ''));
+    try {
+      final fastest = await _directions.getRoute(
+        origin: origin,
+        destination: destination,
+      );
+      if (fastest.length < 2) {
+        emit(state.copyWith(
+          isRouting: false,
+          routePoints: [],
+          routeWaypoints: [],
+          routeCrossesStage: false,
+          routeCrossesStageMessage: 'No route found between selected points.',
+        ));
+        return;
+      }
+
+      if (!routeCrossesStage(fastest)) {
+        emit(state.copyWith(
+          isRouting: false,
+          routePoints: fastest,
+          routeWaypoints: const [],
+          routeCrossesStage: false,
+          routeCrossesStageMessage: '',
+        ));
+        return;
+      }
+
+      final candidates = _buildAvoidanceWaypoints();
+      for (final waypoint in candidates) {
+        final alt = await _directions.getRoute(
+          origin: origin,
+          destination: destination,
+          waypoints: [waypoint],
+        );
+        if (alt.length >= 2 && !routeCrossesStage(alt)) {
+          emit(state.copyWith(
+            isRouting: false,
+            routePoints: alt,
+            routeWaypoints: [waypoint],
+            routeCrossesStage: false,
+            routeCrossesStageMessage:
+                'The fastest route crosses a stage. We\'ve rerouted you around.',
+          ));
+          return;
+        }
+      }
+
+      // Fallback if all alternates still cross stages.
+      emit(state.copyWith(
+        isRouting: false,
+        routePoints: fastest,
+        routeWaypoints: const [],
+        routeCrossesStage: true,
+        routeCrossesStageMessage:
+            'The fastest route crosses a stage. Alternate route is unavailable.',
+      ));
+    } catch (e) {
+      emit(state.copyWith(
+        isRouting: false,
+        routeCrossesStageMessage: 'Unable to build route: $e',
+      ));
+    }
   }
 
   /// Part D: check if route crosses any stage (pure geometry).
@@ -149,5 +237,46 @@ class MapCubit extends Cubit<MapState> {
       );
     }
     return false;
+  }
+
+  List<LatLng> _buildAvoidanceWaypoints() {
+    final allStagePoints = <LatLng>[];
+    for (final points in state.stages.values) {
+      allStagePoints.addAll(points);
+    }
+    if (allStagePoints.isEmpty && state.stagePoints.isNotEmpty) {
+      allStagePoints.addAll(state.stagePoints);
+    }
+    if (allStagePoints.isEmpty) return const [];
+
+    var minLat = allStagePoints.first.latitude;
+    var maxLat = allStagePoints.first.latitude;
+    var minLon = allStagePoints.first.longitude;
+    var maxLon = allStagePoints.first.longitude;
+    for (final p in allStagePoints.skip(1)) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLon) minLon = p.longitude;
+      if (p.longitude > maxLon) maxLon = p.longitude;
+    }
+
+    const margin = 0.01; // roughly >1km, enough to steer around stage zone
+    final north = maxLat + margin;
+    final south = minLat - margin;
+    final west = minLon - margin;
+    final east = maxLon + margin;
+    final midLat = (minLat + maxLat) / 2;
+    final midLon = (minLon + maxLon) / 2;
+
+    return [
+      LatLng(north, midLon),
+      LatLng(south, midLon),
+      LatLng(midLat, west),
+      LatLng(midLat, east),
+      LatLng(north, west),
+      LatLng(north, east),
+      LatLng(south, west),
+      LatLng(south, east),
+    ];
   }
 }

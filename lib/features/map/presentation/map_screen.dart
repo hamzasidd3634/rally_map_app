@@ -91,6 +91,18 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  void _onLongPress(LatLng position) {
+    final cubit = context.read<MapCubit>();
+    final state = cubit.state;
+    if (state.routeOrigin == null || (state.routeOrigin != null && state.routeDestination != null)) {
+      // Start a fresh route selection after two pins are already set.
+      cubit.clearRoute();
+      cubit.setRouteOrigin(position);
+      return;
+    }
+    cubit.setRouteDestination(position);
+  }
+
   /// If tap is within ~25m of any stage polyline, snap to closest point on that stage.
   LatLng _snapToStageIfNear(LatLng tap, Map<String, List<LatLng>> stages, List<LatLng> legacyStagePoints) {
     const refLat = 52.0;
@@ -160,49 +172,113 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: BlocBuilder<MapCubit, MapState>(
-          builder: (context, state) {
-            if (state.isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (state.error != null) {
-              return Center(child: Text('Error: ${state.error}'));
-            }
-            final initialPosition = state.cameraPosition ??
-                const CameraPosition(target: LatLng(48.8610, 2.3610), zoom: 1.0);
-            final polylines = state.polylines;
-            final markers = state.markers;
-            // Rally logo overlay: visible when zoom in [0, 5], anchored at rally location (stage 1 start).
-            final rallyMarkers = <Marker>{};
-            if (state.rallyLogoVisible &&
-                state.stageStart != null &&
-                _rallyLogoDescriptor != null) {
-              rallyMarkers.add(Marker(
-                markerId: const MarkerId('rally_logo'),
-                position: state.stageStart!,
-                icon: _rallyLogoDescriptor!,
-                zIndexInt: 2,
-                flat: true,
-                anchor: const Offset(0.5, 0.5),
-              ));
-            }
-            final allMarkers = {...markers, ...rallyMarkers};
-            return SizedBox.expand(
-              child: GoogleMap(
-                initialCameraPosition: initialPosition,
-                polylines: polylines,
-                markers: allMarkers,
-                onMapCreated: _onMapCreated,
-                onCameraMove: _onCameraMove,
-                onCameraIdle: _onCameraIdle,
-                onTap: _onTap,
-                mapToolbarEnabled: false,
-                zoomControlsEnabled: true,
-                myLocationButtonEnabled: false,
+      body: BlocConsumer<MapCubit, MapState>(
+        listenWhen: (prev, curr) =>
+            prev.routeCrossesStageMessage != curr.routeCrossesStageMessage &&
+            (curr.routeCrossesStageMessage?.isNotEmpty ?? false),
+        listener: (context, state) {
+          final msg = state.routeCrossesStageMessage;
+          if (msg == null || msg.isEmpty) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg)),
+          );
+        },
+        builder: (context, state) {
+          if (state.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (state.error != null) {
+            return Center(child: Text('Error: ${state.error}'));
+          }
+          final initialPosition = state.cameraPosition ??
+              const CameraPosition(target: LatLng(48.8610, 2.3610), zoom: 1.0);
+          final polylines = state.polylines;
+          final markers = state.markers;
+          // Rally logo overlay: visible when zoom in [0, 5], anchored at rally location (stage 1 start).
+          final rallyMarkers = <Marker>{};
+          if (state.rallyLogoVisible &&
+              state.stageStart != null &&
+              _rallyLogoDescriptor != null) {
+            rallyMarkers.add(Marker(
+              markerId: const MarkerId('rally_logo'),
+              position: state.stageStart!,
+              icon: _rallyLogoDescriptor!,
+              zIndexInt: 2,
+              flat: true,
+              anchor: const Offset(0.5, 0.5),
+            ));
+          }
+          final allMarkers = {...markers, ...rallyMarkers};
+          return Stack(
+            children: [
+              SizedBox.expand(
+                child: GoogleMap(
+                  initialCameraPosition: initialPosition,
+                  polylines: polylines,
+                  markers: allMarkers,
+                  onMapCreated: _onMapCreated,
+                  onCameraMove: _onCameraMove,
+                  onCameraIdle: _onCameraIdle,
+                  onTap: _onTap,
+                  onLongPress: _onLongPress,
+                  mapToolbarEnabled: false,
+                  zoomControlsEnabled: true,
+                  myLocationButtonEnabled: false,
+                ),
               ),
-            );
-          },
-        ),
+              Positioned(
+                left: 12,
+                right: 12,
+                top: 12,
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Text(
+                      state.routeOrigin == null
+                          ? 'Long-press to drop Origin pin.'
+                          : state.routeDestination == null
+                              ? 'Long-press again to drop Destination pin.'
+                              : 'Pins set. Tap "Get Route" to calculate fastest path.',
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 12,
+                bottom: 16,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FloatingActionButton.extended(
+                      heroTag: 'route_btn',
+                      onPressed: (state.routeOrigin != null &&
+                              state.routeDestination != null &&
+                              !state.isRouting)
+                          ? () => context.read<MapCubit>().buildRouteWithStageAvoidance()
+                          : null,
+                      icon: state.isRouting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.route),
+                      label: Text(state.isRouting ? 'Routing...' : 'Get Route'),
+                    ),
+                    const SizedBox(height: 10),
+                    FloatingActionButton.extended(
+                      heroTag: 'clear_route_btn',
+                      onPressed: () => context.read<MapCubit>().clearRoute(),
+                      icon: const Icon(Icons.clear),
+                      label: const Text('Clear'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
