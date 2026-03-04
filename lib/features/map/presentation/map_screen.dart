@@ -54,7 +54,7 @@ class _MapScreenState extends State<MapScreen> {
         return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose);
       }
 
-      return BitmapDescriptor.fromBytes(bytes.buffer.asUint8List());
+      return BitmapDescriptor.bytes(bytes.buffer.asUint8List());
     } catch (_) {
       return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose);
     }

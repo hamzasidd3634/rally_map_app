@@ -225,7 +225,9 @@ class MapCubit extends Cubit<MapState> {
         routePoints,
         refLat: refLat,
         toleranceMeters: 2.0,
-      )) return true;
+      )) {
+        return true;
+      }
     }
     if (state.stagePoints.length >= 2) {
       final refLat = state.stagePoints.first.latitude;

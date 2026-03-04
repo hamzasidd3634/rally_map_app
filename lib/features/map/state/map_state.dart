@@ -30,7 +30,7 @@ class MapState extends Equatable {
   });
 
   final CameraPosition? cameraPosition;
-  @Deprecated('Use stages instead')
+
   final List<LatLng> stagePoints;
   /// StageId -> points for each stage route (e.g. stage_1, stage_2, stage_3).
   final Map<String, List<LatLng>> stages;
