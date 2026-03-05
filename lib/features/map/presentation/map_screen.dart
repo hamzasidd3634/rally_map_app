@@ -11,6 +11,8 @@ import 'package:rally_map_app/features/routing/domain/geometry/segment_intersect
 import 'package:rally_map_app/features/routing/domain/export_google_maps_url.dart';
 
 import '../../street_view/presentation/street_view_screen.dart';
+import 'widgets/route_actions_panel.dart';
+import 'widgets/route_hint_card.dart';
 import '../state/map_cubit.dart';
 import '../state/map_state.dart';
 
@@ -250,58 +252,21 @@ class _MapScreenState extends State<MapScreen> {
                 left: 12,
                 right: 12,
                 top: 12,
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: Text(
-                      state.routeOrigin == null
-                          ? 'Long-press to drop Origin pin.'
-                          : state.routeDestination == null
-                              ? 'Long-press again to drop Destination pin.'
-                              : 'Pins set. Tap "Get Route" to calculate fastest path.',
-                    ),
-                  ),
+                child: RouteHintCard(
+                  routeOrigin: state.routeOrigin,
+                  routeDestination: state.routeDestination,
                 ),
               ),
               Positioned(
                 right: 12,
                 bottom: 16,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FloatingActionButton.extended(
-                      heroTag: 'route_btn',
-                      onPressed: (state.routeOrigin != null &&
-                              state.routeDestination != null &&
-                              !state.isRouting)
-                          ? () => context.read<MapCubit>().buildRouteWithStageAvoidance()
-                          : null,
-                      icon: state.isRouting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.route),
-                      label: Text(state.isRouting ? 'Routing...' : 'Get Route'),
-                    ),
-                    const SizedBox(height: 10),
-                    FloatingActionButton.extended(
-                      heroTag: 'clear_route_btn',
-                      onPressed: () => context.read<MapCubit>().clearRoute(),
-                      icon: const Icon(Icons.clear),
-                      label: const Text('Clear'),
-                    ),
-                    const SizedBox(height: 10),
-                    FloatingActionButton.extended(
-                      heroTag: 'export_route_btn',
-                      onPressed: (state.routeOrigin != null && state.routeDestination != null)
-                          ? () => _exportRouteToGoogleMaps(state)
-                          : null,
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('Export'),
-                    ),
-                  ],
+                child: RouteActionsPanel(
+                  hasOrigin: state.routeOrigin != null,
+                  hasDestination: state.routeDestination != null,
+                  isRouting: state.isRouting,
+                  onGetRoute: () => context.read<MapCubit>().buildRouteWithStageAvoidance(),
+                  onClear: () => context.read<MapCubit>().clearRoute(),
+                  onExport: () => _exportRouteToGoogleMaps(state),
                 ),
               ),
             ],
