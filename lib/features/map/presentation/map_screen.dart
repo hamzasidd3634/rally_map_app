@@ -27,11 +27,26 @@ class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _controller;
   BitmapDescriptor? _rallyLogoDescriptor;
   CameraPosition? _lastCameraPosition;
+  List<LatLng> _presetPoints = const [];
+  LatLng? _presetSelection;
+  bool _loadingPresets = false;
 
   @override
   void initState() {
     super.initState();
     _loadRallyLogo();
+    _loadPresetPoints();
+  }
+
+  Future<void> _loadPresetPoints() async {
+    setState(() => _loadingPresets = true);
+    final cubit = context.read<MapCubit>();
+    final points = await cubit.loadPresetPoints();
+    if (!mounted) return;
+    setState(() {
+      _presetPoints = points;
+      _loadingPresets = false;
+    });
   }
 
   Future<void> _loadRallyLogo() async {
@@ -105,6 +120,19 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
     cubit.setRouteDestination(position);
+  }
+
+  void _onPresetSelected(LatLng point) {
+    final cubit = context.read<MapCubit>();
+    final state = cubit.state;
+    if (state.routeOrigin == null ||
+        (state.routeOrigin != null && state.routeDestination != null)) {
+      cubit.clearRoute();
+      cubit.setRouteOrigin(point);
+      return;
+    }
+    cubit.setRouteDestination(point);
+    cubit.buildRouteWithStageAvoidance();
   }
 
   Future<void> _exportRouteToGoogleMaps(MapState state) async {
@@ -191,6 +219,59 @@ class _MapScreenState extends State<MapScreen> {
     return t.clamp(0.0, 1.0);
   }
 
+  // Widget _buildPresetDropdown() {
+  //   if (_loadingPresets) {
+  //     return const Card(
+  //       child: Padding(
+  //         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+  //         child: Row(
+  //           children: [
+  //             SizedBox(
+  //               width: 16,
+  //               height: 16,
+  //               child: CircularProgressIndicator(strokeWidth: 2),
+  //             ),
+  //             SizedBox(width: 8),
+  //             Text('Loading preset points...'),
+  //           ],
+  //         ),
+  //       ),
+  //     );
+  //   }
+  //   if (_presetPoints.isEmpty) {
+  //     return const SizedBox.shrink();
+  //   }
+  //   return Card(
+  //     child: Padding(
+  //       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+  //       child: DropdownButtonHideUnderline(
+  //         child: DropdownButton<LatLng>(
+  //           isExpanded: true,
+  //           value: _presetSelection,
+  //           hint: const Text('Select preset coordinate'),
+  //           items: [
+  //             for (var i = 0; i < _presetPoints.length; i++)
+  //               DropdownMenuItem<LatLng>(
+  //                 value: _presetPoints[i],
+  //                 child: Text(
+  //                   'Point ${i + 1}: '
+  //                   '${_presetPoints[i].latitude.toStringAsFixed(5)}, '
+  //                   '${_presetPoints[i].longitude.toStringAsFixed(5)}',
+  //                 ),
+  //               ),
+  //           ],
+  //           onChanged: (value) {
+  //             if (value == null) return;
+  //             setState(() => _presetSelection = value);
+  //             _onPresetSelected(value);
+  //             setState(() => _presetSelection = null);
+  //           },
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -252,9 +333,16 @@ class _MapScreenState extends State<MapScreen> {
                 left: 12,
                 right: 12,
                 top: 12,
-                child: RouteHintCard(
-                  routeOrigin: state.routeOrigin,
-                  routeDestination: state.routeDestination,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RouteHintCard(
+                      routeOrigin: state.routeOrigin,
+                      routeDestination: state.routeDestination,
+                    ),
+                    const SizedBox(height: 8),
+                    // _buildPresetDropdown(),
+                  ],
                 ),
               ),
               Positioned(
