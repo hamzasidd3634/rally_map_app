@@ -18,10 +18,13 @@ class RouteHintCard extends StatelessWidget {
         : routeDestination == null
             ? 'Long-press again to drop Destination pin.'
             : 'Pins set. Tap "Get Route" to calculate fastest path.';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Text(text),
+    return Padding(
+      padding: const EdgeInsets.only(top: 30),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Text(text),
+        ),
       ),
     );
   }

@@ -20,36 +20,39 @@ class RouteActionsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FloatingActionButton.extended(
-          heroTag: 'route_btn',
-          onPressed: (hasOrigin && hasDestination && !isRouting) ? onGetRoute : null,
-          icon: isRouting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.route),
-          label: Text(isRouting ? 'Routing...' : 'Get Route'),
-        ),
-        const SizedBox(height: 10),
-        FloatingActionButton.extended(
-          heroTag: 'clear_route_btn',
-          onPressed: onClear,
-          icon: const Icon(Icons.clear),
-          label: const Text('Clear'),
-        ),
-        const SizedBox(height: 10),
-        FloatingActionButton.extended(
-          heroTag: 'export_route_btn',
-          onPressed: (hasOrigin && hasDestination) ? onExport : null,
-          icon: const Icon(Icons.open_in_new),
-          label: const Text('Export'),
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.only(right: 35),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'route_btn',
+            onPressed: (hasOrigin && hasDestination && !isRouting) ? onGetRoute : null,
+            icon: isRouting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.route),
+            label: Text(isRouting ? 'Routing...' : 'Get Route'),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'clear_route_btn',
+            onPressed: onClear,
+            icon: const Icon(Icons.clear),
+            label: const Text('Clear'),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'export_route_btn',
+            onPressed: (hasOrigin && hasDestination) ? onExport : null,
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Export'),
+          ),
+        ],
+      ),
     );
   }
 }

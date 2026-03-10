@@ -45,21 +45,34 @@ class DirectionsClient {
     }
     final routes = data['routes'] as List<dynamic>?;
     if (routes == null || routes.isEmpty) return [];
-    final legs = (routes[0] as Map<String, dynamic>)['legs'] as List<dynamic>?;
-    if (legs == null || legs.isEmpty) return [];
     final points = <LatLng>[];
+    final firstRoute = routes[0] as Map<String, dynamic>;
+    final legs = firstRoute['legs'] as List<dynamic>?;
+    if (legs == null || legs.isEmpty) {
+      final overview = firstRoute['overview_polyline'] as Map<String, dynamic>?;
+      final encoded = overview?['points'] as String?;
+      if (encoded == null || encoded.isEmpty) return [];
+      return _dedupeConsecutive(_decodePolyline(encoded));
+    }
     for (final leg in legs) {
       final steps = (leg as Map<String, dynamic>)['steps'] as List<dynamic>?;
       if (steps == null) continue;
       for (final step in steps) {
-        final start = (step as Map<String, dynamic>)['start_location'];
+        final stepMap = step as Map<String, dynamic>;
+        final polyline = stepMap['polyline'] as Map<String, dynamic>?;
+        final encoded = polyline?['points'] as String?;
+        if (encoded != null && encoded.isNotEmpty) {
+          points.addAll(_decodePolyline(encoded));
+          continue;
+        }
+        final start = stepMap['start_location'];
         if (start != null) {
           points.add(LatLng(
             (start['lat'] as num).toDouble(),
             (start['lng'] as num).toDouble(),
           ));
         }
-        final end = step['end_location'];
+        final end = stepMap['end_location'];
         if (end != null) {
           points.add(LatLng(
             (end['lat'] as num).toDouble(),
@@ -81,5 +94,38 @@ class DirectionsClient {
       }
     }
     return out;
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    final points = <LatLng>[];
+    var index = 0;
+    var lat = 0;
+    var lng = 0;
+
+    while (index < encoded.length) {
+      var result = 0;
+      var shift = 0;
+      int b;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20 && index < encoded.length);
+      final dlat = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      lat += dlat;
+
+      result = 0;
+      shift = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20 && index < encoded.length);
+      final dlng = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      lng += dlng;
+
+      points.add(LatLng(lat / 1e5, lng / 1e5));
+    }
+    return points;
   }
 }
