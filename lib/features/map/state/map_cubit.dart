@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'dart:isolate';
 import 'dart:math' as math;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_isolate/flutter_isolate.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:rally_map_app/shared/utils/douglas_peucker.dart';
 
@@ -32,6 +35,20 @@ class _RouteSearchResult {
   final List<LatLng> waypoints;
 }
 
+class _IsolateRouteResult {
+  const _IsolateRouteResult({
+    required this.points,
+    required this.waypoints,
+    required this.detoured,
+    required this.error,
+  });
+
+  final List<LatLng> points;
+  final List<LatLng> waypoints;
+  final bool detoured;
+  final String? error;
+}
+
 class _StageSegment {
   _StageSegment(this.a, this.b)
       : minLat = math.min(a.latitude, b.latitude),
@@ -46,6 +63,7 @@ class _StageSegment {
   final double maxLon;
 }
 
+@pragma('vm:entry-point')
 class MapCubit extends Cubit<MapState> {
   MapCubit({
     StageRepository? stageRepository,
@@ -179,72 +197,30 @@ class MapCubit extends Cubit<MapState> {
     if (origin == null || destination == null) return;
     emit(state.copyWith(isRouting: true, routeCrossesStageMessage: ''));
     try {
-      final stageSegments = _collectStageSegments();
-      if (stageSegments.isEmpty) {
-        emit(state.copyWith(
-          isRouting: false,
-          routePoints: [origin, destination],
-          routeWaypoints: const [],
-          routeCrossesStage: false,
-          routeCrossesStageMessage: '',
-        ));
-        return;
-      }
-
-      if (_pointTooCloseToStages(origin, stageSegments, _stageBufferMeters) ||
-          _pointTooCloseToStages(destination, stageSegments, _stageBufferMeters)) {
+      final stagePolylines = _serializeStagePolylines();
+      final result = await _runRoutingIsolate(
+        origin: origin,
+        destination: destination,
+        stagePolylines: stagePolylines,
+      );
+      if (result == null) {
         emit(state.copyWith(
           isRouting: false,
           routePoints: const [],
           routeWaypoints: const [],
           routeCrossesStage: false,
-          routeCrossesStageMessage: '',
+          routeCrossesStageMessage: 'Unable to build route.',
         ));
         return;
       }
-
-      final direct = [origin, destination];
-      if (!_polylineIntersectsBufferedStages(
-        direct,
-        stageSegments,
-        _stageBufferMeters,
-      )) {
-        emit(state.copyWith(
-          isRouting: false,
-          routePoints: direct,
-          routeWaypoints: const [],
-          routeCrossesStage: false,
-          routeCrossesStageMessage: '',
-        ));
-        return;
-      }
-
-      emit(state.copyWith(
-        routeCrossesStageMessage: 'Searching for alternative route...',
-      ));
-
-      final safe = await _searchUntilFound(
-        origin: origin,
-        destination: destination,
-        stageSegments: stageSegments,
-      );
       emit(state.copyWith(
         isRouting: false,
-        routePoints: safe.points,
-        routeWaypoints: safe.waypoints,
+        routePoints: result.points,
+        routeWaypoints: result.waypoints,
         routeCrossesStage: false,
-        routeCrossesStageMessage:
-            'The fastest route crosses a stage. We\'ve rerouted you around.',
-      ));
-      return;
-
-      // Fallback if all alternates still cross stages.
-      emit(state.copyWith(
-        isRouting: false,
-        routePoints: const [],
-        routeWaypoints: const [],
-        routeCrossesStage: false,
-        routeCrossesStageMessage: '',
+        routeCrossesStageMessage: result.detoured
+            ? 'The fastest route crosses a stage. We\'ve rerouted you around.'
+            : '',
       ));
     } catch (e) {
       emit(state.copyWith(
@@ -254,7 +230,180 @@ class MapCubit extends Cubit<MapState> {
     }
   }
 
-  _RouteSearchResult? _findSafeRouteVisibilityGraph({
+  List<List<List<double>>> _serializeStagePolylines() {
+    final out = <List<List<double>>>[];
+    if (state.stages.isNotEmpty) {
+      for (final entry in state.stages.entries) {
+        final stageId = entry.key;
+        final stage = entry.value;
+        if (stage.isEmpty) continue;
+        out.add(stage
+            .map((p) => <double>[p.latitude, p.longitude])
+            .toList(growable: false));
+        final closedKey = _closedRoadKeyForStage(stageId);
+        if (closedKey != null && state.closedRoads.containsKey(closedKey)) {
+          final road = state.closedRoads[closedKey]!;
+          if (road.isNotEmpty) {
+            out.add(road
+                .map((p) => <double>[p.latitude, p.longitude])
+                .toList(growable: false));
+          }
+        }
+      }
+    } else if (state.stagePoints.isNotEmpty) {
+      out.add(state.stagePoints
+          .map((p) => <double>[p.latitude, p.longitude])
+          .toList(growable: false));
+    }
+    return out;
+  }
+
+  Future<_IsolateRouteResult?> _runRoutingIsolate({
+    required LatLng origin,
+    required LatLng destination,
+    required List<List<List<double>>> stagePolylines,
+  }) async {
+    final receivePort = ReceivePort();
+    FlutterIsolate? isolate;
+    try {
+      isolate = await FlutterIsolate.spawn(
+        MapCubit._routingIsolateEntry,
+        <String, dynamic>{
+          'sendPort': receivePort.sendPort,
+          'origin': <double>[origin.latitude, origin.longitude],
+          'destination': <double>[destination.latitude, destination.longitude],
+          'stages': stagePolylines,
+        },
+      );
+      final response = await receivePort.first
+          .timeout(const Duration(seconds: 15));
+      if (response is! Map) return null;
+      if (response['error'] is String) {
+        return _IsolateRouteResult(
+          points: const [],
+          waypoints: const [],
+          detoured: false,
+          error: response['error'] as String,
+        );
+      }
+      final pointsRaw = response['points'] as List<dynamic>? ?? const [];
+      final waypointsRaw = response['waypoints'] as List<dynamic>? ?? const [];
+      final detoured = response['detoured'] == true;
+      final points = pointsRaw
+          .map((p) => LatLng(
+                (p[0] as num).toDouble(),
+                (p[1] as num).toDouble(),
+              ))
+          .toList(growable: false);
+      final waypoints = waypointsRaw
+          .map((p) => LatLng(
+                (p[0] as num).toDouble(),
+                (p[1] as num).toDouble(),
+              ))
+          .toList(growable: false);
+      return _IsolateRouteResult(
+        points: points,
+        waypoints: waypoints,
+        detoured: detoured,
+        error: null,
+      );
+    } on TimeoutException {
+      return null;
+    } finally {
+      receivePort.close();
+      isolate?.kill(priority: Isolate.immediate);
+    }
+  }
+
+  @pragma('vm:entry-point')
+  static Future<void> _routingIsolateEntry(
+    Map<String, dynamic> message,
+  ) async {
+    final sendPort = message['sendPort'] as SendPort;
+    try {
+      final originPair = message['origin'] as List<dynamic>;
+      final destinationPair = message['destination'] as List<dynamic>;
+      final origin = LatLng(
+        (originPair[0] as num).toDouble(),
+        (originPair[1] as num).toDouble(),
+      );
+      final destination = LatLng(
+        (destinationPair[0] as num).toDouble(),
+        (destinationPair[1] as num).toDouble(),
+      );
+      final stageRaw = message['stages'] as List<dynamic>? ?? const [];
+      final polylines = <List<LatLng>>[];
+      for (final rawLine in stageRaw) {
+        final list = rawLine as List<dynamic>;
+        if (list.isEmpty) continue;
+        polylines.add(list
+            .map((p) => LatLng(
+                  (p[0] as num).toDouble(),
+                  (p[1] as num).toDouble(),
+                ))
+            .toList(growable: false));
+      }
+
+      final stageSegments = _collectStageSegmentsFromPolylines(polylines);
+      if (stageSegments.isEmpty) {
+        sendPort.send({
+          'points': <List<double>>[
+            <double>[origin.latitude, origin.longitude],
+            <double>[destination.latitude, destination.longitude],
+          ],
+          'waypoints': const <List<double>>[],
+          'detoured': false,
+        });
+        return;
+      }
+
+      if (_pointTooCloseToStages(origin, stageSegments, _stageBufferMeters) ||
+          _pointTooCloseToStages(destination, stageSegments, _stageBufferMeters)) {
+        sendPort.send({
+          'points': const <List<double>>[],
+          'waypoints': const <List<double>>[],
+          'detoured': false,
+        });
+        return;
+      }
+
+      final direct = [origin, destination];
+      if (!_polylineIntersectsBufferedStages(
+        direct,
+        stageSegments,
+        _stageBufferMeters,
+      )) {
+        sendPort.send({
+          'points': <List<double>>[
+            <double>[origin.latitude, origin.longitude],
+            <double>[destination.latitude, destination.longitude],
+          ],
+          'waypoints': const <List<double>>[],
+          'detoured': false,
+        });
+        return;
+      }
+
+      final safe = await _searchUntilFound(
+        origin: origin,
+        destination: destination,
+        stageSegments: stageSegments,
+      );
+      sendPort.send({
+        'points': safe.points
+            .map((p) => <double>[p.latitude, p.longitude])
+            .toList(growable: false),
+        'waypoints': safe.waypoints
+            .map((p) => <double>[p.latitude, p.longitude])
+            .toList(growable: false),
+        'detoured': true,
+      });
+    } catch (e) {
+      sendPort.send({'error': e.toString()});
+    }
+  }
+
+  static _RouteSearchResult? _findSafeRouteVisibilityGraph({
     required LatLng origin,
     required LatLng destination,
     required List<_StageSegment> stageSegments,
@@ -297,15 +446,20 @@ class MapCubit extends Cubit<MapState> {
     return null;
   }
 
-  Future<_RouteSearchResult> _searchUntilFound({
+  static Future<_RouteSearchResult> _searchUntilFound({
     required LatLng origin,
     required LatLng destination,
     required List<_StageSegment> stageSegments,
   }) async {
     var detourScale = 1.0;
     var detailScale = 1.0;
+    var attempts = 0;
+    final startedAt = DateTime.now();
+    const maxAttempts = 12;
+    const maxDuration = Duration(seconds: 12);
 
     while (true) {
+      attempts++;
       final safe = _findSafeRouteVisibilityGraph(
         origin: origin,
         destination: destination,
@@ -315,13 +469,18 @@ class MapCubit extends Cubit<MapState> {
       );
       if (safe != null) return safe;
 
+      if (attempts >= maxAttempts ||
+          DateTime.now().difference(startedAt) > maxDuration) {
+        return _RouteSearchResult(points: const [], waypoints: const []);
+      }
+
       detourScale *= 1.35;
       detailScale = math.min(detailScale * 1.2, 4.0);
       await Future.delayed(_searchYield);
     }
   }
 
-  List<LatLng>? _aStarPath(
+  static List<LatLng>? _aStarPath(
     List<LatLng> nodes,
     List<_StageSegment> stageSegments,
     double bufferMeters,
@@ -382,7 +541,7 @@ class MapCubit extends Cubit<MapState> {
     return null;
   }
 
-  List<LatLng> _reconstructNodePath(
+  static List<LatLng> _reconstructNodePath(
     Map<int, int> cameFrom,
     List<LatLng> nodes,
     int current,
@@ -395,7 +554,7 @@ class MapCubit extends Cubit<MapState> {
     return path.reversed.toList();
   }
 
-  List<LatLng> _buildGraphNodes(
+  static List<LatLng> _buildGraphNodes(
     LatLng origin,
     LatLng destination,
     List<_StageSegment> stageSegments,
@@ -427,7 +586,7 @@ class MapCubit extends Cubit<MapState> {
     return nodes;
   }
 
-  List<LatLng> _buildDetourPoints(
+  static List<LatLng> _buildDetourPoints(
     List<_StageSegment> stageSegments,
     double offsetMeters,
     double detailScale,
@@ -462,7 +621,7 @@ class MapCubit extends Cubit<MapState> {
     return out;
   }
 
-  List<double>? _stageBounds(List<_StageSegment> segments) {
+  static List<double>? _stageBounds(List<_StageSegment> segments) {
     if (segments.isEmpty) return null;
     var minLat = segments.first.a.latitude;
     var maxLat = segments.first.a.latitude;
@@ -479,21 +638,21 @@ class MapCubit extends Cubit<MapState> {
     return [minLat, minLon, maxLat, maxLon];
   }
 
-  List<double> _metersToLatLon(double meters, double refLat) {
+  static List<double> _metersToLatLon(double meters, double refLat) {
     final metersPerDegLat = 111320.0;
     final metersPerDegLon =
         111320.0 * math.cos(refLat * math.pi / 180.0).abs().clamp(0.2, 1.0);
     return [meters / metersPerDegLat, meters / metersPerDegLon];
   }
 
-  void _addIfSpaced(List<LatLng> nodes, LatLng point, double minMeters) {
+  static void _addIfSpaced(List<LatLng> nodes, LatLng point, double minMeters) {
     for (final existing in nodes) {
       if (_haversineMeters(existing, point) < minMeters) return;
     }
     nodes.add(point);
   }
 
-  List<LatLng> _offsetPerpendicularPoints(
+  static List<LatLng> _offsetPerpendicularPoints(
     LatLng a,
     LatLng b,
     double offsetMeters,
@@ -524,14 +683,14 @@ class MapCubit extends Cubit<MapState> {
     return [left, right];
   }
 
-  LatLng _segmentMidpoint(LatLng a, LatLng b) {
+  static LatLng _segmentMidpoint(LatLng a, LatLng b) {
     return LatLng(
       (a.latitude + b.latitude) / 2,
       (a.longitude + b.longitude) / 2,
     );
   }
 
-  List<double> _toLocal(LatLng p, double refLat, double refLon) {
+  static List<double> _toLocal(LatLng p, double refLat, double refLon) {
     final metersPerDegLat = 111320.0;
     final metersPerDegLon =
         111320.0 * math.cos(refLat * math.pi / 180.0).abs().clamp(0.2, 1.0);
@@ -541,7 +700,7 @@ class MapCubit extends Cubit<MapState> {
     ];
   }
 
-  LatLng _fromLocal(LatLng origin, double dx, double dy) {
+  static LatLng _fromLocal(LatLng origin, double dx, double dy) {
     final metersPerDegLat = 111320.0;
     final metersPerDegLon =
         111320.0 * math.cos(origin.latitude * math.pi / 180.0).abs().clamp(0.2, 1.0);
@@ -550,22 +709,42 @@ class MapCubit extends Cubit<MapState> {
     return LatLng(origin.latitude + dLat, origin.longitude + dLon);
   }
 
-  double _maxEdgeMeters(LatLng origin, LatLng destination) {
+  static double _maxEdgeMeters(LatLng origin, LatLng destination) {
     final d = _haversineMeters(origin, destination) * 1.5;
     return d.clamp(_maxEdgeMetersFloor, _maxEdgeMetersCap);
+  }
+
+  String? _closedRoadKeyForStage(String stageId) {
+    if (stageId.isEmpty) return null;
+    final match = RegExp(r'(\d+)').firstMatch(stageId);
+    if (match == null) return null;
+    return 'closed_${match.group(1)}';
   }
 
   List<_StageSegment> _collectStageSegments() {
     final out = <_StageSegment>[];
     if (state.stages.isNotEmpty) {
-      for (final stage in state.stages.values) {
+      for (final entry in state.stages.entries) {
+        final stageId = entry.key;
+        final stage = entry.value;
         final simplified = _simplifyStage(stage);
         for (var i = 0; i < simplified.length - 1; i++) {
           out.add(_StageSegment(simplified[i], simplified[i + 1]));
         }
+        final closedKey = _closedRoadKeyForStage(stageId);
+        if (closedKey != null && state.closedRoads.containsKey(closedKey)) {
+          final road = state.closedRoads[closedKey]!;
+          if (road.length >= 2) {
+            final roadSimplified = _simplifyStage(road);
+            for (var i = 0; i < roadSimplified.length - 1; i++) {
+              out.add(_StageSegment(roadSimplified[i], roadSimplified[i + 1]));
+            }
+          }
+        }
       }
       return out;
     }
+
     if (state.stagePoints.length >= 2) {
       final simplified = _simplifyStage(state.stagePoints);
       for (var i = 0; i < simplified.length - 1; i++) {
@@ -575,12 +754,26 @@ class MapCubit extends Cubit<MapState> {
     return out;
   }
 
-  List<LatLng> _simplifyStage(List<LatLng> points) {
+  static List<_StageSegment> _collectStageSegmentsFromPolylines(
+    List<List<LatLng>> polylines,
+  ) {
+    final out = <_StageSegment>[];
+    for (final polyline in polylines) {
+      if (polyline.length < 2) continue;
+      final simplified = _simplifyStage(polyline);
+      for (var i = 0; i < simplified.length - 1; i++) {
+        out.add(_StageSegment(simplified[i], simplified[i + 1]));
+      }
+    }
+    return out;
+  }
+
+  static List<LatLng> _simplifyStage(List<LatLng> points) {
     if (points.length < 3) return points;
     return douglasPeucker(points, _stageSimplifyMeters);
   }
 
-  bool _pointTooCloseToStages(
+  static bool _pointTooCloseToStages(
     LatLng point,
     List<_StageSegment> segments,
     double bufferMeters,
@@ -592,7 +785,7 @@ class MapCubit extends Cubit<MapState> {
     return false;
   }
 
-  bool _polylineIntersectsBufferedStages(
+  static bool _polylineIntersectsBufferedStages(
     List<LatLng> route,
     List<_StageSegment> segments,
     double bufferMeters,
@@ -611,7 +804,7 @@ class MapCubit extends Cubit<MapState> {
     return false;
   }
 
-  bool _segmentClearOfStages(
+  static bool _segmentClearOfStages(
     LatLng a,
     LatLng b,
     List<_StageSegment> segments,
@@ -639,7 +832,7 @@ class MapCubit extends Cubit<MapState> {
     return true;
   }
 
-  double _segmentDistanceMeters(
+  static double _segmentDistanceMeters(
     LatLng a0,
     LatLng a1,
     LatLng b0,
@@ -658,7 +851,7 @@ class MapCubit extends Cubit<MapState> {
     return _segmentDistanceLocal(p0, p1, q0, q1);
   }
 
-  double _segmentDistanceLocal(
+  static double _segmentDistanceLocal(
     List<double> p0,
     List<double> p1,
     List<double> q0,
@@ -734,7 +927,7 @@ class MapCubit extends Cubit<MapState> {
     return math.sqrt(dx * dx + dy * dy);
   }
 
-  double _distancePointToSegmentMeters(
+  static double _distancePointToSegmentMeters(
     LatLng p,
     LatLng a,
     LatLng b,
@@ -762,7 +955,7 @@ class MapCubit extends Cubit<MapState> {
     return math.sqrt(ex * ex + ey * ey);
   }
 
-  double _haversineMeters(LatLng a, LatLng b) {
+  static double _haversineMeters(LatLng a, LatLng b) {
     const r = 6371000.0;
     final dLat = (b.latitude - a.latitude) * math.pi / 180;
     final dLon = (b.longitude - a.longitude) * math.pi / 180;
